@@ -33,7 +33,7 @@ type indexing_strategy = Always | Minimal | Contents
 
 let main indexing_strategy block_count startup_store_type replayable_trace_path
     artefacts_dir keep_store keep_stats_trace no_summary empty_blobs
-    stats_trace_message no_pp_summary gc_when gc_target stop_after_nb_gc =
+    stats_trace_message no_pp_summary gc_when gc_target stop_after_nb_gc skip_gc =
   let startup_store_type =
     match startup_store_type with None -> `Fresh | Some v -> `Copy_from v
   in
@@ -63,6 +63,7 @@ let main indexing_strategy block_count startup_store_type replayable_trace_path
             gc_when;
             gc_target;
             stop_after_nb_gc;
+            skip_gc;
           }
       end)
   in
@@ -229,12 +230,16 @@ let stop_after_nb_gc =
   in
   Arg.(value @@ opt int max_int @@ doc)
 
+let skip_gc =
+  let doc = Arg.info ~doc:"Skip the GC for nb rounds" ["skip-gc"] in
+  Arg.(value @@ opt int 0 @@ doc)
+
 let main_t =
   Term.(
     const main $ indexing_strategy $ block_count $ startup_store_type
     $ replayable_trace_path $ artefacts_dir $ keep_store $ keep_stats_trace
     $ no_summary $ empty_blobs $ stats_trace_message $ no_pp_summary $ gc_when
-    $ gc_target $ stop_after_nb_gc)
+    $ gc_target $ stop_after_nb_gc $ skip_gc)
 
 let () =
   let info =

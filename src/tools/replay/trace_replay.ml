@@ -695,19 +695,32 @@ struct
 
     let gc_target_opt =
       match rs.config.gc_target with
-      | `Distance i -> Stdlib.Hashtbl.find_opt rs.hash_per_level (level - i)
+      | `Distance i ->
+          Stdlib.Hashtbl.find_opt rs.hash_per_level (rs.current_block_idx - i)
       | `Level i -> Stdlib.Hashtbl.find_opt rs.hash_per_level i
       | `Hash h -> Some h
     in
     match (rs.config.gc_when, gc_target_opt) with
     | `Never, _ -> Lwt.return_unit
-    | `Every i, Some target when rs.current_block_idx mod i = 0 ->
-        Context.gc rs.index target
-    | `Every _, _ -> Lwt.return_unit
+    | `Every i, opt_target when rs.current_block_idx mod i = 0 -> (
+        let idx = rs.current_block_idx in
+        let* () = Context.split rs.index in
+        rs.config.skip_gc <- rs.config.skip_gc - 1;
+        match opt_target with
+        | None ->
+            Format.printf "@.Skip no target at %i@.@." idx;
+            Lwt.return ()
+        | Some target ->
+            if rs.config.skip_gc > 0 then (
+              Format.printf "@.Skip at %i@.@." idx;
+              Lwt.return ())
+            else (
+              Format.printf "@.GC at %i@.@." idx;
+              Context.gc rs.index target))
     | `Level lvl, Some target when lvl = level -> Context.gc rs.index target
     | `Level lvl, None when lvl = level ->
         Fmt.failwith "Should GC now but can't find target"
-    | `Level _, _ -> Lwt.return_unit
+    | _ -> Lwt.return_unit
 
   let rec exec_init (rs : cold_replay_state) (row : Def.row) (readonly, ()) =
     let rsref = ref None in
